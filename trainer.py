@@ -1,4 +1,3 @@
-# coding: UTF-8
 import argparse
 import os
 import random
@@ -190,20 +189,16 @@ def main():
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--gpu', '-g', type=int, default=0,
                         help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--n_thread', '-j', type=int, default=8,
+    parser.add_argument('--n_thread', '-t', type=int, default=8,
                         help='Number of parallel data loading thread')
     parser.add_argument('--out', '-o', default='result',
                         help='Directory to output the result')
     parser.add_argument('--resume', '-r', default='',
                         help='Resume the training from snapshot')
-    parser.add_argument('--ab', '-rab', default='',
-                        help='Resume the net from snapshot')
-    parser.add_argument('--ba', '-rba', default='',
-                        help='Resume the net from snapshot')
-    parser.add_argument('--a', '-ra', default='',
-                        help='Resume the net from snapshot')
-    parser.add_argument('--b', '-rb', default='',
-                        help='Resume the net from snapshot')
+    parser.add_argument('--voice_a', '-v', default='src/kizunaAI.wav',
+                        help='Path of source wave file of voice a')
+    parser.add_argument('--voice_b', '-w', default='src/nekomasu.wav',
+                        help='Path of source wave file of voice b')
     args = parser.parse_args()
 
     generator_ab = Unet()
@@ -230,8 +225,8 @@ def main():
     opt_d_b.add_hook(chainer.optimizer.WeightDecay(1e-4))
 
 
-    wave_sourceA = "src/kizunaAI.wav"
-    wave_sourceB = "src/nekomasu.wav"
+    wave_sourceA = args.voice_a
+    wave_sourceB = args.voice_b
     wave_destruction = "{}_unet_{}_{}".format(side, gene_base, disc_base)
 
     wave_a = TestWaverDataset(waver.load(wave_sourceA)[1], test_len)
@@ -251,7 +246,6 @@ def main():
     def out_generated_image(iterator_a, iterator_b, generator_ab, generator_ba, device, dst):
         @chainer.training.make_extension()
         def make_image(trainer):
-            # read data
             with chainer.using_config('train', False):
                 batch_a = iterator_a.next()
                 x_a = convert.concat_examples(batch_a, device)
@@ -289,14 +283,6 @@ def main():
     trainer.extend(out_generated_image(valid_iter_a, valid_iter_b, generator_ab, generator_ba, args.gpu, wave_destruction), trigger=(1, 'epoch'))
     if args.resume:
         chainer.serializers.load_npz(args.resume, trainer)
-    if args.ab:
-        chainer.serializers.load_npz(args.ab, generator_ab)
-    if args.ba:
-        chainer.serializers.load_npz(args.ba, generator_ba)
-    if args.a:
-        chainer.serializers.load_npz(args.a, discriminator_a)
-    if args.b:
-        chainer.serializers.load_npz(args.b, discriminator_b)
     trainer.run()
 
 if __name__ == '__main__':
