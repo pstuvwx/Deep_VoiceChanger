@@ -31,7 +31,7 @@ class WaverDataset(chainer.dataset.DatasetMixin):
     def __init__(self, wave, length):
         self.wave = np.array(wave)
         self.length = length
-        self.max = len(wave)-side*(side-1)+wave_len
+        self.max = len(wave)-side*(side-1)-wave_len
 
     def __len__(self):
         return self.length
@@ -49,7 +49,7 @@ class TestWaverDataset(chainer.dataset.DatasetMixin):
     def __init__(self, wave, length):
         self.wave = np.array(wave)
         self.length = length
-        self.max = len(wave)-side*(side-1)+wave_len
+        self.max = len(wave)-side*(side-1)-wave_len
         if test_len*(side*(side-1)+wave_len) > self.max:
             print("wave file length is too short!")
             print("you have to use more long wave file than 11 second.(and 16kHz sampling rate)")
