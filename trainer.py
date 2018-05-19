@@ -14,7 +14,7 @@ from chainer.dataset import convert
 from chainer import cuda
 
 import waver
-from model import Unet, Discriminator, add_noise_n, gene_base, disc_base
+from model import Unet, Discriminator, add_noise_n, gene_base, disc_base, ResUnet
 
 
 bps = 16000
@@ -31,7 +31,7 @@ class WaverDataset(chainer.dataset.DatasetMixin):
     def __init__(self, wave, length):
         self.wave = np.array(wave)
         self.length = length
-        self.max = len(wave)-512*128*4-1
+        self.max = len(wave)-side*(side-1)-wave_len
 
     def __len__(self):
         return self.length
@@ -39,19 +39,26 @@ class WaverDataset(chainer.dataset.DatasetMixin):
     def get_example(self, i):
         p = random.randint(0, self.max)
         image = waver.image_single_split_pad(self.wave, side, p, pow_scale, fft_scale, wind)
+        if np.max(image) > 1:
+            print(np.max(image))
+            print("max value of data exceeded 1!")
+            print("you should change \'fft_resca\'")
         return image
 
 class TestWaverDataset(chainer.dataset.DatasetMixin):
     def __init__(self, wave, length):
         self.wave = np.array(wave)
         self.length = length
-        self.max = len(wave)-512*128*4-1
+        self.max = len(wave)-side*(side-1)-wave_len
+        if test_len*(side*(side-1)+wave_len) > self.max:
+            print("wave file length is too short!")
+            print("you have to use more long wave file than 11 second.(and 16kHz sampling rate)")
 
     def __len__(self):
         return self.length
 
     def get_example(self, i):
-        p = i * side*(side-1)+wave_len
+        p = i * (side*(side-1)+wave_len)
         image = waver.image_single_split_pad(self.wave, side, p, pow_scale, fft_scale, wind)
         return image
 
@@ -104,8 +111,8 @@ class DiscoGANUpdater(training.StandardUpdater):
         batch_b = self._iterators['second'].next()
         x_b = self.converter(batch_b, self.device)
 
-        x_ab = self.generator_ab(add_noise_n(x_a))
-        x_ba = self.generator_ba(add_noise_n(x_b))
+        x_ab = self.generator_ab(x_a)
+        x_ba = self.generator_ba(x_b)
 
         x_aba = self.generator_ba(x_ab)
         x_bab = self.generator_ab(x_ba)
@@ -183,12 +190,12 @@ def save_comp(path, bps, srces, side, power, scale):
 
 def main():
     parser = argparse.ArgumentParser(description='Voice_DiscoGAN')
-    parser.add_argument('--batchsize', '-b', type=int, default=64,
+    parser.add_argument('--batchsize', '-b', type=int, default=32,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=10000,
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--gpu', '-g', type=int, default=0,
-                        help='GPU ID (negative value indicates CPU)')
+                        help='GPU ID (CPU is not recommend)')
     parser.add_argument('--n_thread', '-t', type=int, default=8,
                         help='Number of parallel data loading thread')
     parser.add_argument('--out', '-o', default='result',
@@ -211,6 +218,10 @@ def main():
         generator_ba.to_gpu()
         discriminator_a.to_gpu()
         discriminator_b.to_gpu()
+    else:
+        print("I'm sorry.")
+        print("Learning with CPU is too slow, GPU is mandatory.")
+        quit()
 
     opt_g_ab = chainer.optimizers.RMSprop(1e-5)
     opt_g_ab.setup(generator_ab)
