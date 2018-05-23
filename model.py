@@ -75,11 +75,12 @@ class Res(chainer.Chain):
                 self.bn1 = L.BatchNormalization(ch)
 
     def __call__(self, x):
-        h = self.c0(x)
+        h = x
+        h = self.c0(h)
         if self.bn:
             h = self.bn0(h)
         h = self.activation(h)
-        h = self.c1(x)
+        h = self.c1(h)
         if self.bn:
             h = self.bn1(h)
         if self.noise:
@@ -89,7 +90,7 @@ class Res(chainer.Chain):
         h = self.activation(h)
         if self.res is not None:
             self.res(h)
-        return h + x
+        return self.activation(h + x)
 
 gene_base = 64
 class ResUnet(chainer.Chain):
