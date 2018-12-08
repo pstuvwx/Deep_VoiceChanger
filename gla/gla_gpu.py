@@ -38,7 +38,7 @@ class GLA_GPU:
             waves = cp.stack([self.overwrap_buf[:, i*self.wave_dif:i*self.wave_dif+self.wave_len]*self.window for i in range(self.buffer_size)], axis=1)
 
             spectrum = cp.fft.fft(waves, axis=2)
-            self.spectrum_buffer = self.absolute_buffer * spectrum / cp.abs(spectrum)
+            self.spectrum_buffer = self.absolute_buffer * spectrum / (cp.abs(spectrum)+1e-10)
             self.spectrum_buffer += 0.5 * (self.spectrum_buffer - last)
 
         waves = cp.fft.ifft(self.spectrum_buffer[:, 0]).real

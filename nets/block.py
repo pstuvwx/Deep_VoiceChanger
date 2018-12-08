@@ -329,18 +329,26 @@ class SNConvBlock(chainer.Chain):
         return h
     
 class SNLinearBlock(chainer.Chain):
-    def __init__(self, in_channels, out_channels, activation=F.leaky_relu):
+    def __init__(self, in_channels, out_channels, activation=F.leaky_relu, dr=None):
         super(SNLinearBlock, self).__init__()
         initializer = chainer.initializers.GlorotUniform()
         self.activation = activation
+        self.dr = dr
+        if type(out_channels) is tuple:
+            self.out_shape = (-1,)+out_channels
+        else:
+            self.out_shape = None
         with self.init_scope():
-            self.l = SNLinear(in_channels,  out_channels, initialW=initializer)
+            self.l = SNLinear(in_channels,  np.prod(out_channels), initialW=initializer)
 
     def __call__(self, x):
-        h = x
-        h = self.l(h)
-        h = self.activation(h)
-        return h
+        if self.dr:
+            x = F.dropout(x, self.dr)
+        x = self.l(x)
+        x = self.activation(x)
+        if self.out_shape:
+            x = F.reshape(x, self.out_shape)
+        return x
 
 class SNMDBlock(chainer.Chain):
     def __init__(self, in_channels, in_size=4, B=100, C=5, gap=True, dr=None):
@@ -359,8 +367,6 @@ class SNMDBlock(chainer.Chain):
             self.md = SNLinear(in_size[0] * in_size[1] * in_channels, B * C, initialW=initializer)
 
     def __call__(self, x):
-        self.md.W.update_rule.hyperparam.lr = 1e-4
-        self.md.b.update_rule.hyperparam.lr = 1e-4
         if self.dr:
             with chainer.using_config('train', True):
                 x = F.dropout(x, self.dr)

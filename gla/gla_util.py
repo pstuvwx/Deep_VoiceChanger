@@ -19,7 +19,6 @@ class GLA:
         self.phase /= np.abs(self.phase)
 
     def inverse(self, spectrum, in_phase=None):
-        spectrum[spectrum == 0] = 1
         spectrum = spectrum.astype(complex)
         if in_phase is None:
             in_phase = self.phase
@@ -36,7 +35,7 @@ class GLA:
             waves = np.vstack([self.overwrap_buf[i*self.wave_dif:i*self.wave_dif+self.wave_len]*self.window for i in range(self.buffer_size)])
 
             spectrum = np.fft.fft(waves, axis=1)
-            self.spectrum_buffer = self.absolute_buffer * spectrum / np.abs(spectrum)
+            self.spectrum_buffer = self.absolute_buffer * spectrum / (np.abs(spectrum)+1e-10)
             self.spectrum_buffer += 0.5 * (self.spectrum_buffer - last)
 
         waves = np.fft.ifft(self.spectrum_buffer[0]).real

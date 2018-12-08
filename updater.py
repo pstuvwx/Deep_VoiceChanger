@@ -41,26 +41,26 @@ class Updater(training.StandardUpdater):
         # self.backup_b = self.xp.zeros((backup_num*self.bch, 1, dataset.height, 128), dtype=self.xp.float32)
     
     def loss_hinge_disc(self, fake, real):
-        loss = F.mean(F.relu(1. - real))
-        loss += F.mean(F.relu(1. + fake))
+        loss = F.mean(F.relu(0.1 - real))
+        loss += F.mean(F.relu(0.1 + fake))
         return loss
 
     def loss_hinge_gene(self, fake):
         loss = F.mean(F.relu(-fake))
         return loss
 
-    def loss_ls_disc(self, fake, real):
-        loss = F.mean(F.square(0.5 - real))
-        loss += F.mean(F.square(0.5 + fake))
-        return loss
+    # def loss_ls_disc(self, fake, real):
+    #     loss = F.mean(F.square(0.5 - real))
+    #     loss += F.mean(F.square(0.5 + fake))
+    #     return loss
 
-    def loss_ls_gene(self, fake):
-        loss = F.mean(F.square(fake))
-        return loss
+    # def loss_ls_gene(self, fake):
+    #     loss = F.mean(F.square(fake))
+    #     return loss
 
-    def loss_hinge_mean(self, a, b, eps=0.1):
-        loss = F.mean(F.relu(F.absolute(a-b)-eps))
-        return loss
+    # def loss_hinge_mean(self, a, b, eps=0.1):
+    #     loss = F.mean(F.relu(F.absolute(a-b)-eps))
+    #     return loss
 
     def clip_weight(self, target, lim):
         for n, c in target.namedparams():
@@ -113,7 +113,7 @@ class Updater(training.StandardUpdater):
         gan_loss   = self.loss_hinge_gene(xy_disc)
         ident_loss = F.mean_absolute_error(y, yy)
 
-        loss_gene = recon_loss*3.0 + gan_loss*1.0 + ident_loss*1.0
+        loss_gene = recon_loss*10.0 + gan_loss + ident_loss
 
         # self.backup_set(backup, xy)
 
@@ -144,7 +144,7 @@ class Updater(training.StandardUpdater):
         gan_loss   = self.loss_hinge_gene(ab_disc) + self.loss_hinge_gene(ba_disc)
         ident_loss = F.mean_absolute_error(a, aa)  + F.mean_absolute_error(b, bb)
 
-        loss_gene = recon_loss*3.0 + gan_loss*1.0 + ident_loss*1.0
+        loss_gene = recon_loss*10.0 + gan_loss + ident_loss
 
         # self.backup_set(backup, xy)
 
@@ -196,8 +196,7 @@ class Updater(training.StandardUpdater):
 
     def update_core(self):
         if self.iteration % 2 == 0:
-            self.gene_update_half(True)
-            self.gene_update_half(False)
+            self.gene_update_full()
         else:
             self.disc_update_half(True)
             self.disc_update_half(False)

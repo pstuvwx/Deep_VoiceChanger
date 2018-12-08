@@ -25,8 +25,7 @@ def find_wav(path):
             dst.append(path + "/" + n)
     return dst
 
-power02 = False
-scale = 20 if power02 else 9
+scale = 9
 bias = -6.2
 
 height = 128
@@ -61,11 +60,8 @@ def wave2input_image(wave, window, pos=0):
     spectrum_image = np.fft.fft(wave_image, axis=1)
     input_image = np.abs(spectrum_image[:,:128].reshape(1, height, 128), dtype=np.float32)
 
-    if power02:
-        np.power(input_image, 0.2, out=input_image)
-    else:
-        np.clip(input_image, 1000, None, out=input_image)
-        np.log(input_image, out=input_image)
+    np.clip(input_image, 1000, None, out=input_image)
+    np.log(input_image, out=input_image)
     input_image += bias
     input_image /= scale
 
@@ -78,15 +74,13 @@ def wave2input_image(wave, window, pos=0):
 
 def reverse(output_image):
     src = output_image[0]
+    src[src > 1] = 1
     src *= scale
     src -= bias
     np.abs(src, out=src)
-    if power02:
-        np.power(src, 5, out=src)
-    else:
-        np.exp(src, out=src)
+    np.exp(src, out=src)
     
-    # src = np.concatenate([src,src], axis=1).reshape((-1, 128))
+    src[src < 1] = 1
 
     mil = np.array(src[:,1:127][:,::-1])
     src = np.concatenate([src, mil], 1)

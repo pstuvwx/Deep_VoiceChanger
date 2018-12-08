@@ -27,8 +27,10 @@ def init_gene(gpu):
     opts = []
     for n in nets:
         n.to_gpu()
-        o = chainer.optimizers.Adam(1e-5, beta1=0.5, beta2=0.999)
+        o = chainer.optimizers.Adam(1e-6, beta1=0.5, beta2=0.999)
+        # o = chainer.optimizers.SGD(1e-5)
         o.setup(n)
+        o.add_hook(chainer.optimizer.WeightDecay(1e-4))
         opts.append(o)
 
     return nets[0], nets[1], opts[0], opts[1]
@@ -43,8 +45,10 @@ def init_disc(gpu):
     opts = []
     for n in nets:
         n.to_gpu()
-        o = chainer.optimizers.Adam(4e-4, beta1=0.5, beta2=0.999)
+        o = chainer.optimizers.Adam(5e-6, beta1=0.5, beta2=0.999)
+        # o = chainer.optimizers.SGD(1e-5)
         o.setup(n)
+        o.add_hook(chainer.optimizer.WeightDecay(1e-4))
         opts.append(o)
 
     return nets[0], nets[1], opts[0], opts[1]
@@ -52,7 +56,7 @@ def init_disc(gpu):
 def preview_convert(iterator_a, iterator_b, g_a, g_b, device, gla, dst):
     @chainer.training.make_extension()
     def make_preview(trainer):
-        with chainer.using_config('train', True):
+        with chainer.using_config('train', False):
             with chainer.no_backprop_mode():
                 x_a = iterator_a.next()
                 x_a = convert.concat_examples(x_a, device)
@@ -87,7 +91,7 @@ def preview_convert(iterator_a, iterator_b, g_a, g_b, device, gla, dst):
 
 def main():
     parser = argparse.ArgumentParser(description='Deep_VoiceChanger')
-    parser.add_argument('--batchsize', '-b', type=int, default=32,
+    parser.add_argument('--batchsize', '-b', type=int, default=16,
                         help='Number of images in each mini-batch')
     parser.add_argument('--iteration', '-i', type=int, default=200000,
                         help='Number of to train iteration')
@@ -118,10 +122,14 @@ def main():
     parser.add_argument('--test_b', '-u', default='../src/nekomasu_short.wav',
                         help='Path of test wave file of voice b')
     args = parser.parse_args()
+    if args.test_a == '':
+        args.test_a = args.voice_a
+    if args.test_b == '':
+        args.test_b = args.voice_b
 
     chainer.global_config.autotune = True 
 
-    wave_destruction = "../results/result_128x128_C2R7D05_SN_GAP_leakyrelu02_sigmoid_3_1_1_SNMD1005lr1e4_base32_1on2_half_hinge_mae_batch32_Adam1e5050999_Adam4e4050999"
+    wave_destruction = "../results/result_128x128_C5Ro3Dr2_skipadd_SN_GAP_leakyrelu02_None_10_1_1_SNMD1005_batch16_hinge01_full_Adam1e6050999_Adam5e6050999"
 
     generator_ab, generator_ba, opt_g_a, opt_g_b = init_gene(args.gpu)
     discriminator_a, discriminator_b, opt_d_a, opt_d_b = init_disc(args.gpu)
