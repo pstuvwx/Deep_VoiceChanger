@@ -21,13 +21,13 @@ This code use 'CycleGAN' to replace someone's voice to other's voice.
 You can hear contents that A spoke in B's voice.  
 
 ## Demo  
-[元音声A (raw)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.a.wav)  
-[変換後A→B (converted A to B)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.ab.wav)  
-[再変換A→B→A (reconverted A to B to A)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.aba.wav)  
+[元音声A (raw)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/a.wav)  
+[変換後A→B (converted A to B)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/ab.wav)  
+[再変換A→B→A (reconverted A to B to A)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/aba.wav)  
 
-[元音声B (raw)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.b.wav)  
-[変換後B→A (converted B to A)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.ba.wav)  
-[再変換B→A→B (reconverted B to A to B)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo.bab.wav)  
+[元音声B (raw)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/b.wav)  
+[変換後B→A (converted B to A)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/ba.wav)  
+[再変換B→A→B (reconverted B to A to B)](https://github.com/pstuvwx/Deep_VoiceChanger/blob/master/demo/bab.wav)  
 
 音声は[キズナアイさん](https://youtu.be/CPvD2qz-rG4?list=PL0bHKk6wuUGKbc1g6y_azaIeLwKTf1QfM&t=444)と[ねこますさん](https://youtu.be/lllCzDqlExo)です。  
 Used voices are [キズナアイさん](https://youtu.be/CPvD2qz-rG4?list=PL0bHKk6wuUGKbc1g6y_azaIeLwKTf1QfM&t=444) and [ねこますさん](https://youtu.be/lllCzDqlExo).  
