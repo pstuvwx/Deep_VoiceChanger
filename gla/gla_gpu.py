@@ -1,5 +1,6 @@
 import numpy as np
 import cupy as cp
+import tqdm
 
 class GLA_GPU:
     def __init__(self, parallel, wave_len=254, wave_dif=64, buffer_size=5, loop_num=5, window=np.hanning(254)):
@@ -7,6 +8,7 @@ class GLA_GPU:
         self.wave_dif = wave_dif
         self.buffer_size = buffer_size
         self.loop_num = loop_num
+        self.parallel = parallel
         self.window = cp.array([window for _ in range(parallel)])
 
         self.wave_buf = cp.zeros((parallel, wave_len+wave_dif), dtype=float)
@@ -41,41 +43,68 @@ class GLA_GPU:
             self.spectrum_buffer = self.absolute_buffer * spectrum / (cp.abs(spectrum)+1e-10)
             self.spectrum_buffer += 0.5 * (self.spectrum_buffer - last)
 
-        waves = cp.fft.ifft(self.spectrum_buffer[:, 0]).real
+        dst = cp.asnumpy(self.spectrum_buffer[:, 0])
         self.absolute_buffer = cp.roll(self.absolute_buffer, -1, axis=1)
         self.spectrum_buffer = cp.roll(self.spectrum_buffer, -1, axis=1)
 
-        self.wave_buf = cp.roll(self.wave_buf, -self.wave_dif, axis=1)
-        self.wave_buf[:, -self.wave_dif:] = 0
-        self.wave_buf[:, self.wave_dif:] += waves
-        return cp.asnumpy(self.wave_buf[:, :self.wave_dif])
+        return dst
+    
+    def auto_inverse(self, whole_spectrum):
+        whole_spectrum = np.copy(whole_spectrum).astype(complex)
+        whole_spectrum[whole_spectrum < 1] = 1
+        overwrap = self.buffer_size * 2
+        height = whole_spectrum.shape[0]
+        parallel_dif = (height-overwrap) // self.parallel
+        if height < self.parallel*overwrap:
+            raise Exception('voice length is too small to use gpu, or parallel number is too big')
+
+        spec = [self.inverse(whole_spectrum[range(i, i+parallel_dif*self.parallel, parallel_dif), :]) for i in tqdm.tqdm(range(parallel_dif+overwrap))]
+        spec = spec[overwrap:]
+        spec = np.concatenate(spec, axis=1)
+        spec = spec.reshape(-1, self.wave_len)
+
+        #Below code don't consider wave_len and wave_dif, I'll fix.
+        wave = np.fft.ifft(spec, axis=1).real
+        pad = np.zeros((wave.shape[0], 2), dtype=float)
+        wave = np.concatenate([wave, pad], axis=1)
+
+        dst = np.zeros((wave.shape[0]+3)*self.wave_dif, dtype=float)
+        for i in range(4):
+            w = wave[range(i, wave.shape[0], 4),:]
+            w = w.reshape(-1)
+            dst[i*self.wave_dif:i*self.wave_dif+len(w)] += w
+        return dst*0.5
+
 
 if __name__ == "__main__":
-    import dataset
-    import time
+    import tqdm
+    import scipy.io.wavfile as wav
 
-    bps, wave = dataset.load(input("wave path..."))
+    def load(path):
+        bps, data = wav.read(path)
+        if len(data.shape) != 1:
+            data = data[:,0] + data[:,1]
+        return bps, data
+
+    def save(path, bps, data):
+        if data.dtype != np.int16:
+            data = data.astype(np.int16)
+        data = np.reshape(data, -1)
+        wav.write(path, bps, data)
+
+    path = input("enter wave path...")
+    bps, wave = load(path)
     cp.cuda.Device(input('gpu number...')).use()
 
 
     wave_len = 254
     wave_dif = 64
-    parts_num = 1000
     window = np.hanning(wave_len)
-    num = (len(wave)//wave_dif-3)//parts_num*parts_num
-    spl = np.vstack([np.fft.fft(wave[i:i+wave_len]*window) for i in range(0, wave_dif*num, wave_dif)])
-    spl[spl == 0] = 1
-    absolute = np.abs(spl).astype(complex).reshape((-1, parts_num, wave_len))
+    spec = np.vstack([np.fft.fft(wave[i:i+wave_len]*window) for i in range(0, len(wave) - 3 * wave_dif, wave_dif)]).reshape(-1, wave_len)
+    spec = np.abs(spec)
 
-    print(absolute.shape[0])
-    gla = GLA_GPU(absolute.shape[0])
+    gla = GLA_GPU(128)
 
-    start = time.time()
-    dst = [gla.inverse(absolute[:, i, :]) for i in range(parts_num)]
-    end = time.time()
+    w = gla.auto_inverse(spec)
 
-    print('convert time per wave_dif', (end - start) / num, 'wave_dif time', wave_dif / bps)
-
-    w = np.stack(dst, axis=1).reshape(-1)
-
-    dataset.save("w.wav", bps, w)
+    save(path+'gla.wav', bps, w)

@@ -27,7 +27,7 @@ def upsample_conv_frq(x, conv):
     return conv(_upsample_frq(x))
 
 class ResBlock(chainer.Chain):
-    def __init__(self, in_channels, out_channels, ksize=3, pad=1, activation=F.leaky_relu, mode='none', bn=True, dr=None):
+    def __init__(self, in_channels, out_channels, ksize=3, pad=1, activation=F.leaky_relu, mode='none', bn=False, dr=None):
         super(ResBlock, self).__init__()
         initializer = chainer.initializers.GlorotUniform()
         initializer_sc = chainer.initializers.GlorotUniform()
@@ -74,48 +74,8 @@ class ResBlock(chainer.Chain):
     def __call__(self, x):
         return self.residual(x) + self.shortcut(x)
 
-class FrqBlock(chainer.Chain):
-    def __init__(self, in_channels, out_channels, activation=F.leaky_relu, mode='none', dr=None):
-        super(FrqBlock, self).__init__()
-        initializer = chainer.initializers.GlorotUniform()
-        initializer_sc = chainer.initializers.GlorotUniform()
-        self.activation = activation
-        self.mode = _downsample_frq if mode == 'down' else _upsample_frq if mode == 'up' else None
-        self.dr = dr
-        self.learnable_sc = in_channels != out_channels
-        with self.init_scope():
-            self.c1 = L.Convolution2D(in_channels,  out_channels, ksize=(1,9), pad=(0,4), initialW=initializer, nobias=True)
-            self.c2 = L.Convolution2D(out_channels, out_channels, ksize=3,     pad=1,     initialW=initializer, nobias=True)
-            self.b  = L.BatchNormalization(in_channels)
-            if self.learnable_sc:
-                self.c_sc = L.Convolution2D(in_channels, out_channels, ksize=1, pad=0, initialW=initializer_sc)
-
-    def residual(self, x):
-        h = x
-        h = self.c1(h)
-        h = self.b(h)
-        h = self.activation(h)
-        if self.mode:
-            h = self.mode(h)
-        if self.dr:
-            with chainer.using_config('train', True):
-                h = F.dropout(h, self.dr)
-        h = self.c2(h)
-        return h
-
-    def shortcut(self, x):
-        if self.mode:
-            x = self.mode(x)
-        if self.learnable_sc:
-            x = self.c_sc(x)
-        return x
-
-    def __call__(self, x):
-        return self.residual(x) + self.shortcut(x)
-
-
 class ConvBlock(chainer.Chain):
-    def __init__(self, in_channels, out_channels, mode='none', activation=F.leaky_relu, bn=True, dr=None):
+    def __init__(self, in_channels, out_channels, mode='none', activation=F.leaky_relu, bn=False, dr=None):
         super(ConvBlock, self).__init__()
         initializer = chainer.initializers.GlorotUniform()
         self.activation = activation
@@ -140,6 +100,10 @@ class ConvBlock(chainer.Chain):
             elif mode == 'frq-up':
                 self.c = L.Convolution2D(in_channels, out_channels, ksize=(1,9), stride=1, pad=(0,4), initialW=initializer, nobias=bn)
                 self.activation = lambda x: activation(_upsample(x))
+            elif mode == 'pad':
+                self.c = L.Convolution2D(in_channels, out_channels, ksize=3, stride=1, pad=2, initialW=initializer, nobias=bn)
+            elif mode == 'trim':
+                self.c = L.Convolution2D(in_channels, out_channels, ksize=3, stride=1, pad=0, initialW=initializer, nobias=bn)
             else:
                 raise Exception('mode is missing')
             if bn:
@@ -228,63 +192,6 @@ class SNResBlock(chainer.Chain):
 
     def __call__(self, x):
         return self.residual(x) + self.shortcut(x)
-
-class SNFrqBlock(chainer.Chain):
-    def __init__(self, in_channels, out_channels, activation=F.relu, sample='none'):
-        super(SNFrqBlock, self).__init__()
-        initializer = chainer.initializers.GlorotUniform()
-        initializer_sc = chainer.initializers.GlorotUniform()
-        self.activation = activation
-        self.sample = _downsample_frq if sample == 'down' else _upsample_frq if sample == 'up' else None
-        self.learnable_sc = in_channels != out_channels or sample == 'down' or sample == 'up'
-        with self.init_scope():
-            self.c1 = SNConvolution2D(in_channels,  out_channels, ksize=(1,9), pad=(0,4), initialW=initializer)
-            self.c2 = SNConvolution2D(out_channels, out_channels, ksize=3,     pad=1,     initialW=initializer)
-            if self.learnable_sc:
-                self.c_sc = SNConvolution2D(in_channels, out_channels, ksize=1, pad=0, initialW=initializer_sc)
-
-    def residual(self, x):
-        h = x
-        h = self.activation(h)
-        h = self.c1(h)
-        h = self.activation(h)
-        h = self.c2(h)
-        if self.sample:
-            h = self.sample(h)
-        return h
-
-    def shortcut(self, x):
-        if self.learnable_sc:
-            x = self.c_sc(x)
-            if self.sample:
-                return self.sample(x)
-            else:
-                return x
-        else:
-            return x
-
-    def __call__(self, x):
-        return self.residual(x) + self.shortcut(x)
-
-# class SNConvBlock(chainer.Chain):
-#     def __init__(self, in_channels, out_channels, activation=F.leaky_relu, sample='none'):
-#         super(SNConvBlock, self).__init__()
-#         initializer = chainer.initializers.GlorotUniform()
-#         self.activation = activation
-#         self.sample = _downsample if sample == 'down' else _upsample if sample == 'up' else None
-#         with self.init_scope():
-#             if sample == 'frq':
-#                 self.c = SNConvolution2D(in_channels,  out_channels, ksize=(1, 9), stride=1, pad=(0, 4), initialW=initializer)
-#             else:
-#                 self.c = SNConvolution2D(in_channels,  out_channels, ksize=3, stride=1, pad=1, initialW=initializer)
-
-#     def __call__(self, x):
-#         h = x
-#         h = self.c(h)
-#         if self.sample:
-#             h = self.sample(h)
-#         h = self.activation(h)
-#         return h
 
 class SNConvBlock(chainer.Chain):
     def __init__(self, in_channels, out_channels, mode='none', activation=F.leaky_relu, bn=False, dr=None):
@@ -383,5 +290,87 @@ class SNMDBlock(chainer.Chain):
         h = F.concat([feature, d])
 
         h = self.l(h)
+        return h
+
+class SNL1DBlock(chainer.Chain):
+    def __init__(self, in_ch, out_ch, width, activation=F.leaky_relu, dr=None):
+        super(SNL1DBlock, self).__init__()
+        initializer = chainer.initializers.GlorotUniform()
+        self.activation = activation
+        self.dr = dr
+        self.out_ch = out_ch
+        with self.init_scope():
+            self.l = SNLinear(in_ch*width, out_ch*width, initialW=initializer)
+
+    def __call__(self, x):
+        if self.dr:
+            x = F.dropout(x, self.dr)
+        x = F.transpose(x, (0, 2, 1, 3))
+        out_shape = list(x.shape)
+        x = F.reshape(x, (-1, x.shape[2]*x.shape[3]))
+        x = self.l(x)
+        x = self.activation(x)
+        out_shape[2] = self.out_ch
+        x = F.reshape(x, out_shape)
+        x = F.transpose(x, (0, 2, 1, 3))
+        return x
+
+class L1DBlock(chainer.Chain):
+    def __init__(self, in_ch, out_ch, width, activation=F.leaky_relu, dr=None):
+        super(L1DBlock, self).__init__()
+        initializer = chainer.initializers.GlorotUniform()
+        self.activation = activation
+        self.dr = dr
+        self.out_ch = out_ch
+        with self.init_scope():
+            self.l = L.Linear(in_ch*width, out_ch*width, initialW=initializer)
+
+    def __call__(self, x):
+        if self.dr:
+            x = F.dropout(x, self.dr)
+        x = F.transpose(x, (0, 2, 1, 3))
+        out_shape = list(x.shape)
+        x = F.reshape(x, (-1, x.shape[2]*x.shape[3]))
+        x = self.l(x)
+        x = self.activation(x)
+        out_shape[2] = self.out_ch
+        x = F.reshape(x, out_shape)
+        x = F.transpose(x, (0, 2, 1, 3))
+        return x
+
+class CLBlock(chainer.Chain):
+    def __init__(self, in_ch, out_ch, width, activation=F.leaky_relu, liner_out_ch=1, dr=None):
+        super(CLBlock, self).__init__()
+        self.dr = dr
+        if out_ch - liner_out_ch <= 0:
+            raise Exception('out_ch <= liner_out_ch!')
+        with self.init_scope():
+            self.c = ConvBlock(in_ch, out_ch-liner_out_ch, activation=activation)
+            self.l = L1DBlock(in_ch, liner_out_ch, width, activation)
+
+    def __call__(self, x):
+        h = x
+        if self.dr:
+            h = F.dropout(h, self.dr)
+        h1 = self.c(h)
+        h2 = self.l(h)
+        h = F.concat([h1,h2])
+        return h
+
+class SNCLBlock(chainer.Chain):
+    def __init__(self, in_ch, out_ch, width, activation=F.leaky_relu, dr=None):
+        super(SNCLBlock, self).__init__()
+        self.dr = dr
+        with self.init_scope():
+            self.c = SNConvBlock(in_ch, out_ch-1, activation=activation)
+            self.l = SNL1DBlock(in_ch, 1, width, activation)
+
+    def __call__(self, x):
+        h = x
+        if self.dr:
+            h = F.dropout(h, self.dr)
+        h1 = self.c(h)
+        h2 = self.l(h)
+        h = F.concat([h1,h2])
         return h
 

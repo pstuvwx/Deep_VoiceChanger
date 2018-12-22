@@ -48,7 +48,7 @@ class GLA:
         return self.wave_buf[:self.wave_dif]*0.5
 
 if __name__ == "__main__":
-    import time
+    import tqdm
     import scipy.io.wavfile as wav
     def load(path):
         bps, data = wav.read(path)
@@ -64,27 +64,18 @@ if __name__ == "__main__":
 
 
     bps, wave = load(input("path..."))
-    wave = wave[:160000]
-
 
     wave_len = 254
     wave_dif = 64
     window = np.hanning(wave_len)
     num = len(wave)//wave_dif-3
     spl = np.vstack([np.fft.fft(wave[i:i+wave_len]*window) for i in range(0, wave_dif*num, wave_dif)])
-    spl[spl == 0] = 1
-    phase = np.random.randn(len(spl), wave_len) + np.random.randn(len(spl), wave_len)*1j
-    phase[phase == 0] = 1
-    phase /= np.abs(phase)
     absolute = np.abs(spl)
+    spl[absolute < 1] = 1
 
     gla = GLA()
 
-    start = time.time()
-    dst = [gla.inverse(a) for a in absolute]
-    end = time.time()
-
-    print('convert time per wave_dif', (end - start) / num, 'wave_dif time', wave_dif / bps)
+    dst = [gla.inverse(a) for a in tqdm.tqdm(absolute)]
 
     w = np.hstack(dst)
 
