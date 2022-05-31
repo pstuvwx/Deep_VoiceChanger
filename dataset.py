@@ -94,7 +94,8 @@ def wave2input_image(wave, window, pos=0, pad=0):
     wave_image = np.hstack([wave[pos+i*sride:pos+(i+pad*2)*sride+dif].reshape(height+pad*2, sride) for i in range(256//sride)])[:,:254]
     wave_image *= window
     spectrum_image = np.fft.fft(wave_image, axis=1)
-    input_image = np.abs(spectrum_image[:,:128].reshape(1, height+pad*2, 128), dtype=np.float32)
+    input_image = np.abs(spectrum_image[:,:128].reshape(1, height+pad*2, 128))
+    input_image = input_image.astype(np.float32)
 
     np.clip(input_image, 1000, None, out=input_image)
     np.log(input_image, out=input_image)
