@@ -31,7 +31,7 @@ class Updater(training.StandardUpdater):
         self.opt_d_b = opt_d_b
 
         self.converter = convert.concat_examples
-        self.device = device
+        self._device = device
         self.iteration = 0
         self.xp = self.generator_ab.xp
         self.bch = iterator_a.batch_size
@@ -61,8 +61,8 @@ class Updater(training.StandardUpdater):
             disc = self.discriminator_a
             opt = self.opt_g_b
 
-        x = Variable(self.converter(itr_x.next(), self.device))
-        y = Variable(self.converter(itr_y.next(), self.device))
+        x = Variable(self.converter(itr_x.next(), self._device))
+        y = Variable(self.converter(itr_y.next(), self._device))
 
         xy  = gene_xy(x)
         xyx = gene_yx(xy)
@@ -86,8 +86,8 @@ class Updater(training.StandardUpdater):
             'loss/g/gene':  gan_loss})
     
     def gene_update_full(self):
-        a = Variable(self.converter(self.itr_a.next(), self.device))
-        b = Variable(self.converter(self.itr_b.next(), self.device))
+        a = Variable(self.converter(self.itr_a.next(), self._device))
+        b = Variable(self.converter(self.itr_b.next(), self._device))
 
         ab  = self.generator_ab(a)
         ba  = self.generator_ba(b)
@@ -130,8 +130,8 @@ class Updater(training.StandardUpdater):
             disc = self.discriminator_b
             opt = self.opt_d_b
 
-        real = Variable(self.converter(itr_r.next(), self.device))
-        fake = Variable(self.converter(itr_f.next(), self.device))
+        real = Variable(self.converter(itr_r.next(), self._device))
+        fake = Variable(self.converter(itr_f.next(), self._device))
         fake = gene(fake)
 
         real = disc(real)
