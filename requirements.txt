@@ -1,0 +1,3 @@
+chainer
+cupy == 7.8.0
+tqdm
